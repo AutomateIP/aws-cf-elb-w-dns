@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation template to create a load balancer, target
+  group, listener, allocate an elastic IP, and attach an instance to the target
+  group.
+Parameters:
+  InstanceId:
+    Description: The instance ID to attach to the target group
+    Type: String
+  VpcId:
+    Description: The VPC ID where resources will be created
+    Type: String
+  Subnet1:
+    Description: The first subnet ID for the load balancer
+    Type: String
+  SecurityGroup:
+    Description: The security group ID for the load balancer
+    Type: String
+  TargetGroupName:
+    Description: The target group name
+    Type: String
+  LoadBalancerName:
+    Description: The load balancer name
+    Type: String
+  ServerFQDN:
+    Description: The fqdn for the application
+    Type: String
+Resources:
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Ref TargetGroupName
+      Port: 3000
+      Protocol: TCP
+      VpcId: !Ref VpcId
+      TargetType: instance
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: '3000'
+      HealthCheckPath: /version
+      HealthCheckIntervalSeconds: 10
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 8
+      UnhealthyThresholdCount: 2
+      Targets:
+        - Id: !Ref InstanceId
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      NetworkBorderGroup: us-east-1
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Ref LoadBalancerName
+      SubnetMappings:
+        - AllocationId: !GetAtt ElasticIP.AllocationId
+          SubnetId: !Ref Subnet1
+      Type: network
+      SecurityGroups:
+        - !Ref SecurityGroup
+      Scheme: internet-facing
+  ACMCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref ServerFQDN
+      DomainValidationOptions:
+        - DomainName: !Ref ServerFQDN
+          HostedZoneId: Z0459831128WMBM3R2GIG
+      KeyAlgorithm: RSA_2048
+      ValidationMethod: DNS
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: TLS
+      Certificates:
+        - CertificateArn: !Ref ACMCertificate
+  RecordSet:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Ref ServerFQDN
+      Type: A
+      HostedZoneName: se.itential.io.
+      Region: us-east-1
+      AliasTarget:
+        DNSName: !GetAtt LoadBalancer.DNSName
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
+        EvaluateTargetHealth: true
+      SetIdentifier: demo-record-id
+Outputs:
+  ElasticIPAddress:
+    Description: The Elastic IP address
+    Value: !Ref ElasticIP
+  ServerFQDN:
+    Description: The full URL for the application resolvabla via Route53
+    Value: !Ref ServerFQDN
