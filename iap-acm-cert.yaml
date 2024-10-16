@@ -29,12 +29,12 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: !Ref TargetGroupName
-      Port: 3000
-      Protocol: TCP
+      Port: 3443
+      Protocol: TLS
       VpcId: !Ref VpcId
       TargetType: instance
-      HealthCheckProtocol: HTTP
-      HealthCheckPort: '3000'
+      HealthCheckProtocol: HTTPS
+      HealthCheckPort: '3443'
       HealthCheckPath: /version
       HealthCheckIntervalSeconds: 10
       HealthCheckTimeoutSeconds: 5
